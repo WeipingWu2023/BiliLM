@@ -1,4 +1,7 @@
-# Optional: install only after approval. Keep the working Whisper environment untouched until then.
+# Optional: install only after approval, using the core lock as constraints.
 # Install a matching torch/torchaudio CPU pair first; see docs/SENSEVOICE.md.
 funasr==1.4.14
 sentencepiece>=0.2,<0.3
+numpy==1.26.4
+torch==2.8.0
+torchaudio==2.8.0

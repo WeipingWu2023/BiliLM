@@ -9,11 +9,13 @@ type ModelState = { model: string; usable: boolean; cached: boolean; runtime_rea
 export function QualityControls({ value, onChange }: { value: ASRSettings; onChange: (value: ASRSettings) => void }) {
   const [info, setInfo] = useState<{ hardware: Hardware; warnings: Record<string, string[]> } | null>(null);
   const [models, setModels] = useState<ModelState[]>([]); const [installError, setInstallError] = useState(''); const [installing, setInstalling] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => { let active = true; const refresh = () => fetch('/api/asr/models').then(r => r.ok ? r.json() : []).then(rows => { if (active) setModels(rows); }).catch(() => {}); void refresh(); const timer = setInterval(refresh,4000); return () => { active = false; clearInterval(timer); }; }, []);
   useEffect(() => { fetch('/api/asr/hardware').then(r => r.ok ? r.json() : null).then(setInfo).catch(() => {}); }, []);
   const set = (patch: Partial<ASRSettings>) => onChange({ ...value, ...patch });
   const sensevoice = value.backend === 'sensevoice';
   const selected = models.find(m => m.model === value.model);
+  useEffect(() => { if (selected && !selected.usable) setOpen(true); }, [value.model, selected?.usable]);
   const sensevoiceRuntime = models.find(m => m.model === 'SenseVoiceSmall')?.runtime_ready;
   async function install() {
     setInstalling(true); setInstallError('');
@@ -22,7 +24,7 @@ export function QualityControls({ value, onChange }: { value: ASRSettings; onCha
     finally { setInstalling(false); }
   }
   const profile = ({ small: 'fast', medium: 'balanced', 'large-v3': 'accuracy', turbo: 'turbo' } as Record<string, string>)[value.model];
-  return <details className="quality-controls"><summary>转录质量与术语 <span>{value.model} · {value.language === 'auto' ? '自动语言' : value.language}</span></summary><div className="quality-grid">
+  return <details className="quality-controls" open={open} onToggle={event => setOpen(event.currentTarget.open)}><summary>转录质量与术语 <span>{value.model} · {value.language === 'auto' ? '自动语言' : value.language}</span></summary><div className="quality-grid">
     <label>识别后端<select aria-label="识别后端" value={value.backend} onChange={e => set({ backend: e.target.value as ASRSettings['backend'], model: e.target.value === 'sensevoice' ? 'SenseVoiceSmall' : 'small', allow_model_download: false })}><option value="faster-whisper">Whisper · 支持 medium / large-v3 / turbo</option><option value="sensevoice" disabled={sensevoiceRuntime === false}>SenseVoice · {sensevoiceRuntime === false ? '需额外安装运行依赖' : '实验后端'}</option></select></label>
     <label>质量配置<select aria-label="转录质量" disabled={sensevoice} value={value.model} onChange={e => set({ model: e.target.value })}>{sensevoice && <option value="SenseVoiceSmall">SenseVoiceSmall · 尚未实测</option>}<option value="small">Fast · small（原 MVP）</option><option value="medium">Balanced · medium</option><option value="large-v3">High Accuracy · large-v3（名称不代表实测结论）</option><option value="turbo">turbo · 对照候选</option><option value="tiny">tiny · 快速检查</option><option value="base">base</option></select></label>
     <label>语言<select aria-label="转录语言" value={value.language} onChange={e => set({ language: e.target.value, multilingual: false })}><option value="auto">自动识别 / 中英混合</option><option value="zh">普通话为主 · zh</option><option value="yue">粤语 · yue（需模型支持）</option><option value="en">英语 · en</option></select></label>
@@ -36,7 +38,7 @@ export function QualityControls({ value, onChange }: { value: ASRSettings; onCha
     <label>语音边缘保留 ms<input disabled={sensevoice} type="number" min={0} max={2000} value={value.speech_pad_ms} onChange={e => set({ speech_pad_ms: Number(e.target.value) })} /></label>
     <label>静音分隔 ms<input disabled={sensevoice} type="number" min={100} max={5000} value={value.min_silence_duration_ms} onChange={e => set({ min_silence_duration_ms: Number(e.target.value) })} /></label>
     <label className="quality-check quality-wide"><input type="checkbox" disabled={sensevoice} checked={value.allow_model_download} onChange={e => set({ allow_model_download: e.target.checked })} /> 明确允许首次下载所选 Whisper 大模型（可能占用数 GB）</label>
-    {sensevoice && <p className="quality-note quality-wide">SenseVoice 只读取已批准准备的本地缓存，页面不会下载。此适配器暂不使用 beam、术语提示或 VAD；时间戳仅表示最多 30 秒输入窗，不能当作逐词对齐。当前未安装/实测，默认仍为 Whisper small。</p>}
+    {sensevoice && <p className="quality-note quality-wide">SenseVoice 转录只读取本地缓存；模型可由上方显式下载，运行依赖通过 install-models.ps1 -IncludeSenseVoice 准备。此适配器暂不使用 beam、术语提示或 VAD；时间戳仅表示最多 30 秒输入窗，不能当作逐词对齐。{selected?.usable ? '本机模型与依赖已准备；准确率仍需真值评测。' : '请先完成模型和运行依赖安装。'}默认仍为 Whisper small。</p>}
     {info && <p className="quality-note quality-wide">{info.hardware.cpu_threads} 逻辑核心 · RAM {info.hardware.ram_gib?.toFixed(1) ?? '未知'} GiB · 可用 {info.hardware.available_ram_gib?.toFixed(1) ?? '未知'} GiB · CUDA {info.hardware.cuda_devices} · VRAM {info.hardware.available_vram_gib?.toFixed(1) ?? '未知'} GiB<br />{info.warnings[profile]?.join(' ')}{value.device === 'cuda' && !info.hardware.cuda_devices && '当前主机无 CUDA；GPU 任务需要兼容 worker。'}</p>}
     <p className="quality-note quality-wide">词表只作为识别提示，不自动替换原词。beam=8、VAD 参数和更大模型是否更准，都需要相同音频真值对照。small 保留为兼容默认，尚未依据准确率评测选新默认。</p>
   </div></details>;

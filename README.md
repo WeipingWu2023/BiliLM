@@ -6,9 +6,9 @@
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.1.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.1.1** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.1.1) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
@@ -16,6 +16,10 @@
 ![桌面首页](docs/assets/home-desktop.png)
 
 [手机首页截图](docs/assets/home-mobile.png)。资料库与任务列表在截图时置空，未删除本机数据。
+
+![导图全屏画布](docs/assets/mindmap-desktop.png)
+
+导图截图使用明确标注的合成界面夹具，不是真实视频文字、模型准确率证据或人工真值。支持曲线连线、全屏、拖动、滚轮缩放及键盘操作。
 
 </details>
 
@@ -34,7 +38,7 @@
 | 无 Key 使用 | 本地转录、编辑、导出、原文检索和原句提要可用 |
 | 队列、重试、资料库、缓存、多次转录记录 | SQLite 持久保存 |
 | ASR 客观评测、人工真值标注 | 工具已具备；9 个空槽位，尚无人工核对样本 |
-| SenseVoiceSmall | 实验性可选后端，需额外安装；不作为已验收推荐 |
+| SenseVoiceSmall | 可选后端，Windows CPU 短片段可用性已验证；准确率未测 |
 
 ## 下载与安装（Windows 11）
 
@@ -101,6 +105,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1 -SkipInstall
 
 换模型：展开“转录质量与术语”，查看安装状态。先下载 medium 等候选模型，再在已有笔记中点击**重新转录**。直接打开旧笔记会使用已有缓存，不会因下拉框改变就重新识别。
 
+也可以先停止 BiliLM，在项目根目录运行以下命令，准备 medium、large-v3、turbo，以及 SenseVoiceSmall 的 CPU 依赖和权重（共需数 GB，执行即表示主动选择下载）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-models.ps1 -IncludeSenseVoice
+```
+
+仅准备三个 Whisper 候选可省略 `-IncludeSenseVoice`。完成后重新启动 `start.cmd`。不启动长时间评测，不改变默认 small。详见[高级模型与导图更新](docs/MODELS-MINDMAP-v0.1.1.md)。
+
 ## DeepSeek 与隐私
 
 在来源问答底部点击 **DeepSeek 设置**，填写自己的 API Key 和账户可用模型名，再点击**保存并启用 DeepSeek**。密钥不用发给任何人。接口模型可能调整，以你的服务账户为准。
@@ -120,7 +132,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1 -SkipInstall
 - **人工真值目前为 0，CER/WER/术语准确率等均未测。** 工具会拒绝把未核对文本当真值，见 [benchmarks/README.md](benchmarks/README.md)。
 - 单个笔记对应一个视频，不支持跨视频混合问答；对话只保留当前工作区最近上下文，未提供完整持久聊天历史。
 - 自动总结/导图的来源 JSON 有 45000 字符预算，超限会明确拒绝。长来源问答可能只使用相关检索片段，并标明范围。
-- SenseVoice 时间戳暂为输入窗口范围，不是逐词对齐。Windows CPU 未完成真实 SenseVoice 推理验收。
+- SenseVoice 时间戳暂为输入窗口范围，不是逐词对齐。已通过 Windows CPU 的 6 秒真实音频可用性检查，尚未完成长音频和人工准确率评测。
 - 当前仅面向本机单用户；无公网认证、配额或多租户隔离。不要把 3000/8000 端口公开，也不要用 SQLite 共享盘连接多台机器。
 - 已分离 API/worker 并提供可替换 ASR 接口；Linux GPU/多机部署尚未验收。
 

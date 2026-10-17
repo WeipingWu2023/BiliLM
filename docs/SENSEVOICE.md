@@ -1,6 +1,6 @@
 # SenseVoiceSmall 可选后端
 
-当前状态：适配器已实现，**尚未安装可选运行时、下载模型或进行真实推理验证**。现有 faster-whisper/small 默认值不变。支持 Windows 11 CPU 的代码路径；Linux/GPU 使用相同 `ASRBackend.transcribe` 接口，但都需要获批后的真实环境验收。不能把 mocked 测试当作模型识别质量证据。
+当前状态（v0.1.1）：**已安装并下载，Windows 11 CPU 的 6 秒真实音频推理检查通过**。FunASR 1.4.14、匹配的 PyTorch/torchaudio 2.8.0 CPU，核心 NumPy 固定为同时兼容 Whisper 与 FunASR 的 1.26.4。现有 faster-whisper/small 默认值不变。Linux/GPU 接口相同，但真实推理未验收。短片段可用性不等于准确率评测或长音频验收。
 
 ## 为什么这样接入
 
@@ -18,21 +18,21 @@ FFmpeg 生成与 Whisper 一致的 16kHz、单声道 PCM16，保留原文件及�
 
 ## 获得明确批准后才执行
 
-以下命令**本次没有执行**。先审核官方模型卡许可证、确定模型的完整 commit 和依赖空间开销。PyTorch/torchaudio 必须为匹配版本；保留当前工作环境的依赖清单，建议先在独立环境验证解析结果，避免破坏现有 Whisper。
+本机已获用户批准并执行下载和安装；其他使用者仍需主动准备自己的依赖与权重。先停止服务，以免 Windows 中已加载的 DLL 阻碍安装。推荐 `powershell -NoProfile -ExecutionPolicy Bypass -File .\install-models.ps1 -IncludeSenseVoice`。这个脚本还会准备三个 Whisper 高级候选，不会自动跑评测。手动步骤如下：
 
 Windows PowerShell，项目根目录：
 
 ```powershell
 # 仅在批准安装后：安装匹配的 CPU wheel；GPU 工作者另选对应 CUDA wheel。
-.\.venv\Scripts\python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements-sensevoice.txt
+.\.venv\Scripts\python.exe -m pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m pip install --index-url https://pypi.org/simple -c backend/requirements.lock.txt -r backend/requirements-sensevoice.txt
 
 # 仅在批准下载这个完整 commit 后执行。
 $env:PYTHONPATH = 'backend'
 .\.venv\Scripts\python.exe -m app.sensevoice --download --revision 3847d57b6bdf2dd8875cb1508d2af43d80a16bf7
 ```
 
-模型缓存默认 `data/models/sensevoice-small`，只下载 `config.yaml`、`configuration.json`、`model.pt`、`chn_jpn_yue_eng_ko_spectok.bpe.model`、`am.mvn` 五个文件。快照完成后写 `bililm-snapshot.json` 固定来源、commit 与文件 hash。目录非空时拒绝覆盖，避免运行中的快照被替换；可由服务器管理员设置 `BILILM_SENSEVOICE_MODEL_DIR` 指向新的可信离线目录。HTTP 请求没有任意模型目录参数。也可手工放入完整官方快照；没有 commit 元数据时只记录本地文件 hash，不伪称已知仓库版本。
+模型缓存默认 `data/models/sensevoice-small`，只下载 `config.yaml`、`configuration.json`、`model.pt`、`chn_jpn_yue_eng_ko_spectok.bpe.model`、`am.mvn` 五个文件。下载先写固定 revision 的 staging 目录，中断可重试；文件完整并写入 `bililm-snapshot.json` 后才原子切换为正式快照。已有非空正式目录仍拒绝覆盖，避免运行中的快照被替换；管理员可设置 `BILILM_SENSEVOICE_MODEL_DIR` 指向新的可信离线目录。HTTP 请求没有任意模型目录参数。手工放入的模型若没有 commit 元数据，只记录文件 hash，不伪称已知仓库版本。
 
 待批准快照：[3847d57b6bdf2dd8875cb1508d2af43d80a16bf7](https://huggingface.co/FunAudioLLM/SenseVoiceSmall/commit/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7)。[官方文件列表](https://huggingface.co/FunAudioLLM/SenseVoiceSmall/tree/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7)标示权重约 936 MB；另需 PyTorch 等运行时，未实测安装后磁盘与内存占用。
 

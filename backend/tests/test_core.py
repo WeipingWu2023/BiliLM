@@ -159,13 +159,14 @@ class Tests(unittest.TestCase):
     def test_asr_passes_normalized_pcm_without_pyav_decode(self):
         from app.asr import transcribe
         import numpy as np
+        from numpy.testing import assert_array_equal
         source=db.DATA/'speech.mp3'
         def ffmpeg_run(*args,**kwargs):
             with wave.open(str(source.with_suffix('.asr.wav')),'wb') as audio:
                 audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(16000)
                 audio.writeframes(np.array([0,16384,-16384],dtype=np.int16).tobytes())
         def recognize(samples,**kw):
-            np.testing.assert_array_equal(samples,np.array([0,0.5,-0.5],dtype=np.float32))
+            assert_array_equal(samples,np.array([0,0.5,-0.5],dtype=np.float32))
             return iter([SimpleNamespace(start=0,end=1,text='Hello')]),SimpleNamespace(duration=1)
         engine=SimpleNamespace(transcribe=recognize)
         with patch('app.asr.subprocess.run',side_effect=ffmpeg_run),patch('app.asr.model',return_value=engine):

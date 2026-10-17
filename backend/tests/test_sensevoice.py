@@ -57,6 +57,25 @@ class SenseVoiceTests(unittest.TestCase):
         with self.assertRaises(ValueError): sensevoice.download_snapshot('main')
         with self.assertRaisesRegex(RuntimeError,'模型目录非空'): sensevoice.download_snapshot('a'*40)
 
+    def test_download_retry_resumes_staging_without_exposing_partial_snapshot(self):
+        revision='a'*40
+        attempts=[]
+        def transfer(*args,**kwargs):
+            target=Path(kwargs['local_dir']); attempts.append(target); target.mkdir(parents=True,exist_ok=True)
+            if len(attempts)==1:
+                (target/'model.pt').write_bytes(b'partial')
+                raise OSError('interrupted')
+            self.assertEqual((target/'model.pt').read_bytes(),b'partial')
+            for name in sensevoice.REQUIRED_FILES:
+                (target/name).write_bytes(b'complete')
+        with patch('huggingface_hub.snapshot_download',side_effect=transfer):
+            with self.assertRaises(OSError): sensevoice.download_snapshot(revision)
+            self.assertFalse(self.directory.exists())
+            self.assertEqual(sensevoice.download_snapshot(revision),self.directory)
+        self.assertEqual(attempts[0],attempts[1])
+        self.assertFalse(attempts[0].exists())
+        self.assertEqual(sensevoice.snapshot(revision)[1]['revision'],revision)
+
     def test_loader_uses_builtin_config_without_hub_or_remote_code(self):
         self.fake_snapshot()
         config={'model':'SenseVoiceSmall','model_conf':{},'encoder':'SenseVoiceEncoderSmall','encoder_conf':{},

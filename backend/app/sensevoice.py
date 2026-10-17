@@ -159,18 +159,24 @@ def transcribe(source, config, progress, report=None, playback=None):
 
 
 def download_snapshot(revision):
-    """Explicit maintenance command only. Never called from web or worker inference."""
+    """Explicit model preparation only. Never called during transcription."""
     if not re.fullmatch(r'[0-9a-f]{40}',revision):
         raise ValueError('下载必须指定 Hugging Face 模型的完整 40 位 commit，不能使用可变 main/tag')
     directory = model_directory()
     if directory.exists() and any(directory.iterdir()):
         raise RuntimeError('模型目录非空；拒绝覆盖已有快照。请由管理员选择新的 BILILM_SENSEVOICE_MODEL_DIR。')
     from huggingface_hub import snapshot_download
-    snapshot_download(REPOSITORY,revision=revision,local_dir=str(directory),allow_patterns=list(REQUIRED_FILES))
-    missing = [name for name in REQUIRED_FILES if not (directory/name).is_file()]
+    # Incomplete transfers stay in a revision-specific staging directory, so retry
+    # can resume safely without ever modifying an active model snapshot.
+    staging = directory.with_name(directory.name+'.download-'+revision)
+    snapshot_download(REPOSITORY,revision=revision,local_dir=str(staging),allow_patterns=list(REQUIRED_FILES))
+    missing = [name for name in REQUIRED_FILES if not (staging/name).is_file() or not (staging/name).stat().st_size]
     if missing: raise RuntimeError('下载快照不完整：'+', '.join(missing))
-    (directory/'bililm-snapshot.json').write_text(json.dumps({'repository':REPOSITORY,'revision':revision,
-        'files_sha256':{name:sha256(directory/name) for name in REQUIRED_FILES}},ensure_ascii=False,indent=2),encoding='utf-8')
+    (staging/'bililm-snapshot.json').write_text(json.dumps({'repository':REPOSITORY,'revision':revision,
+        'files_sha256':{name:sha256(staging/name) for name in REQUIRED_FILES}},ensure_ascii=False,indent=2),encoding='utf-8')
+    if directory.exists():
+        directory.rmdir()  # Empty destinations only; never delete a model recursively.
+    staging.replace(directory)
     return directory
 
 
