@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: Number(process.env.BILILM_DPR || 1) });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   const assert = (condition, message) => { if (!condition) throw Error(message); };
   const rows = [
@@ -53,6 +53,22 @@ const path = require('node:path');
     const prior = await page.getByRole('button', { name: '重置为百分之百' }).innerText();
     await page.mouse.wheel(0, -240);
     await page.waitForFunction(text => document.querySelector('.map-scale')?.textContent !== text, prior);
+    // Zoom must redraw text through layout, never enlarge a composited text bitmap.
+    await page.getByRole('button', { name: '重置为百分之百' }).click();
+    const branch = page.locator('.mindmap-branch').nth(2), unzoomed = await branch.boundingBox();
+    const anchor = { x: unzoomed.x + unzoomed.width / 2, y: unzoomed.y + unzoomed.height / 2 };
+    await page.mouse.move(anchor.x, anchor.y);
+    // Exact CSS-pixel wheel delta for the 200% rendering assertion. The physical
+    // mouse wheel path above is also checked; this assertion avoids host wheel sensitivity.
+    await canvas.dispatchEvent('wheel', { deltaY: -Math.log(2) / 0.0015, clientX: anchor.x, clientY: anchor.y, bubbles: true, cancelable: true });
+    await page.waitForFunction(() => Number(document.querySelector('.map-tree').style.zoom) > 1.95);
+    const rendering = await tree.evaluate(el => ({ zoom: Number(el.style.zoom), transform: getComputedStyle(el).transform, willChange: getComputedStyle(el).willChange }));
+    assert(rendering.transform === 'none' && rendering.willChange === 'auto', 'Text must not use a scaled GPU layer');
+    const enlarged = await branch.boundingBox();
+    assert(Math.abs(enlarged.width / unzoomed.width - 2) < 0.04, 'Layout zoom must double node size');
+    assert(Math.abs(enlarged.x + enlarged.width / 2 - anchor.x) < 2 && Math.abs(enlarged.y + enlarged.height / 2 - anchor.y) < 2, 'Zoom must preserve the cursor anchor');
+    const textFolder = path.join(__dirname, '../docs/assets'); fs.mkdirSync(textFolder, { recursive: true });
+    await branch.screenshot({ path: path.join(textFolder, 'mindmap-text-200.png') });
     await page.getByRole('button', { name: '适应窗口', exact: true }).click();
     await page.locator('.mindmap-leaf').first().click();
     await dialog.locator('.mindmap-evidence').waitFor();
@@ -73,6 +89,6 @@ const path = require('node:path');
     await page.getByRole('button', { name: '关闭思维导图' }).click();
     assert(!await dialog.isVisible(), 'Close must dismiss dialog');
     assert(!errors.length && externalRequests === 0, 'No browser errors or external AI requests');
-    console.log(JSON.stringify({ status: 'passed', fullscreen: true, pointer_pan: true, wheel_zoom: true, keyboard: true, citations: true, mobile: true, fixture_only: true, errors }));
+    console.log(JSON.stringify({ status: 'passed', fullscreen: true, pointer_pan: true, wheel_zoom: true, text_layout_zoom: true, cursor_anchor: true, dpr: Number(process.env.BILILM_DPR || 1), keyboard: true, citations: true, mobile: true, fixture_only: true, errors }));
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

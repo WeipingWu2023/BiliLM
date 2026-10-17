@@ -139,21 +139,21 @@ progress { accent-color:var(--accent); width:90px; height:5px; }
 .map-viewer .map-canvas { flex:1; min-height:0; height:auto; overflow:hidden; position:relative; cursor:grab; touch-action:none; background:#23282d; }
 .map-canvas[data-dragging] { cursor:grabbing; }
 .map-canvas[data-dragging] * { cursor:grabbing!important; user-select:none; }
-.map-viewer .map-tree { position:absolute; left:0; top:0; min-width:0; padding:38px; transform-origin:0 0; will-change:transform; user-select:none; }
+.map-viewer .map-tree { position:absolute; left:0; top:0; min-width:0; padding:38px; user-select:none; }
 .map-tree .map-links { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
 .map-links path { fill:none; stroke:#a5bfd7; stroke-width:1.5; }
 .map-tree [data-map-node] { position:relative; z-index:1; }
 .map-viewer .mindmap-tree ul { padding-left:56px; }
 .map-viewer .mindmap-tree li { padding:10px 0; }
 .map-viewer .mindmap-tree li::before,.map-viewer .mindmap-tree li::after { display:none; }
-.map-viewer .mindmap-root { width:250px; border:0; border-radius:7px; padding:18px 20px; font-size:15px; line-height:1.7; color:#fff; background:#4e5068; }
+.map-viewer .mindmap-root { width:250px; border:0; border-radius:7px; padding:18px 20px; font-size:17px; line-height:1.7; color:#fff; background:#4e5068; }
 .map-viewer .mindmap-branch { width:280px; padding:13px 15px; border:0; border-radius:7px; background:#414c57; }
-.map-viewer .mindmap-branch>button { font-size:14px; line-height:1.7; align-items:center; color:#f5f6f8; }
+.map-viewer .mindmap-branch>button { font-size:16px; line-height:1.7; align-items:center; color:#f5f6f8; }
 .map-viewer .mindmap-branch>button>svg { flex-shrink:0; color:#c7d8e8; }
-.map-viewer .mindmap-leaf { width:300px; padding:15px 18px; border:1px solid transparent; border-radius:7px; color:#f0f5f3; background:#304741; font-size:14px; line-height:1.8; }
+.map-viewer .mindmap-leaf { width:300px; padding:15px 18px; border:1px solid transparent; border-radius:7px; color:#f0f5f3; background:#304741; font-size:15px; line-height:1.8; }
 .map-viewer .mindmap-leaf:hover { background:#3d5a50; border-color:#a6cbbd; }
 .map-viewer .learning-citations { margin-top:7px; }
-.map-viewer .learning-citations button { color:#d9e7f5; background:#536575; font-size:9px; }
+.map-viewer .learning-citations button { color:#eef5fc; background:#536575; font-size:11px; }
 .map-navigation { align-self:flex-end; position:relative; z-index:2; display:flex; align-items:center; gap:4px; flex-shrink:0; padding:5px; margin:-57px 22px 13px; background:#2c3238; border:1px solid #48525c; border-radius:12px; box-shadow:0 3px 12px #1116; }
 .map-navigation .icon-button { width:34px; height:34px; }
 .map-navigation>span { width:1px; height:20px; background:var(--line); margin:0 4px; }

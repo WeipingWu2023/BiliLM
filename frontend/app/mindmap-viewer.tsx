@@ -25,7 +25,14 @@ export function MindMapViewer({ open, onClose, title, map, onLocate, onExport }:
   // Continuous pan updates stay outside React: nodes do not rerender per pointer move.
   const paint = useCallback(() => {
     const { x, y, scale } = pose.current;
-    if (tree.current) tree.current.style.transform = `translate3d(${x}px,${y}px,0) scale(${scale})`;
+    if (tree.current) {
+      // Layout zoom rerasterizes glyphs at the requested size instead of stretching
+      // a cached GPU text layer. Snap panning to device pixels as well.
+      const pixel = window.devicePixelRatio || 1;
+      tree.current.style.zoom = String(scale);
+      tree.current.style.left = `${Math.round(x * pixel) / pixel / scale}px`;
+      tree.current.style.top = `${Math.round(y * pixel) / pixel / scale}px`;
+    }
     if (scaleLabel.current) scaleLabel.current.textContent = `${Math.round(scale * 100)}%`;
   }, []);
   const fit = useCallback(() => {

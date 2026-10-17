@@ -6,9 +6,9 @@
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.1.1** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.1.2** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.1.1) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.1.2) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
@@ -20,6 +20,8 @@
 ![导图全屏画布](docs/assets/mindmap-desktop.png)
 
 导图截图使用明确标注的合成界面夹具，不是真实视频文字、模型准确率证据或人工真值。支持曲线连线、全屏、拖动、滚轮缩放及键盘操作。
+
+v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点与时间戳字号。[200% 文字特写](docs/assets/mindmap-text-200.png)。
 
 </details>
 
