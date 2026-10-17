@@ -1,0 +1,4 @@
+# Optional: install only after approval. Keep the working Whisper environment untouched until then.
+# Install a matching torch/torchaudio CPU pair first; see docs/SENSEVOICE.md.
+funasr==1.4.14
+sentencepiece>=0.2,<0.3
