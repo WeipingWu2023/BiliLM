@@ -17,6 +17,8 @@ class ASRConfig(BaseModel):
     beam_size: Literal[5,8] = 5
     topic: str = Field(default='',max_length=300)
     glossary: str = Field(default='',max_length=2000)
+    ai_proofread: bool = False
+    proofread_search: bool = False
     vad_filter: bool = True
     vad_threshold: float = Field(default=0.5,ge=0.1,le=0.9)
     speech_pad_ms: int = Field(default=400,ge=0,le=2000)
@@ -24,6 +26,8 @@ class ASRConfig(BaseModel):
 
     @model_validator(mode='after')
     def select_profile(self):
+        if self.proofread_search and not self.ai_proofread:
+            raise ValueError('联网核对专名需要先启用 AI 校对')
         if self.backend == 'sensevoice' and self.profile:
             raise ValueError('Whisper 质量档位不能用于 SenseVoice；请直接选择 SenseVoiceSmall')
         if self.profile:

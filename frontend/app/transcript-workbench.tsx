@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconCopy, IconDownload, IconFileText, IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import { ASRSettings, QualityControls } from './quality-controls';
+import { AIProofreadingPanel, ProofreadSummary } from './ai-proofreading-panel';
 type Segment = { start: number; end: number; text: string; avg_logprob?: number };
 type Correction = { id: string; segment_index: number; before_text: string; after_text: string; reason: string; state: string };
-type Run = { id: string; provenance: string; raw: Segment[]; proofread: Segment[]; readable_segments: Segment[]; readable: string; proof_revision: number; readable_revision: number; mapped: number; playback: string | null; audio: string | null; config: Record<string, string | number>; metrics: Record<string, unknown>; corrections: Correction[]; change_log: unknown[] };
+type Run = { id: string; provenance: string; raw: Segment[]; proofread: Segment[]; readable_segments: Segment[]; readable: string; proof_revision: number; readable_revision: number; mapped: number; playback: string | null; audio: string | null; config: Record<string, string | number>; metrics: Record<string, unknown>; corrections: Correction[]; change_log: unknown[]; proofreading?: ProofreadSummary | null };
 type Choice = { id: string; provenance: string; config: Record<string, string | number>; created_at: string };
 const time = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 const localDate = (value: string) => new Date(value.replace(' ', 'T') + 'Z').toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
@@ -19,7 +20,7 @@ export function TranscriptWorkbench({ videoKey, config, onConfig, onRunId, onDir
   const [editing, setEditing] = useState(false); const [draft, setDraft] = useState<string[]>([]); const [busy, setBusy] = useState(false);
   const [removeFiller, setRemoveFiller] = useState(false); const [compareId, setCompareId] = useState(''); const [differences, setDifferences] = useState<{ start: number; primary: string; secondary: string }[]>([]);
   const [job, setJob] = useState<{ id: string; progress: number; stage: string; status: string; error: string } | null>(null);
-  const selected = useRef(''); const audio = useRef<HTMLAudioElement>(null); const limit = useRef<number | null>(null); const wantLatest = useRef(false); const latest = useRef('');
+  const completedProofread = useRef(''); const selected = useRef(''); const audio = useRef<HTMLAudioElement>(null); const limit = useRef<number | null>(null); const wantLatest = useRef(false); const latest = useRef('');
   const rows = run ? view === 'raw' ? run.raw : view === 'proofread' ? run.proofread : run.readable_segments : [];
   const dirty = editing && draft.some((t, i) => t !== rows[i]?.text);
   useEffect(() => {
@@ -53,6 +54,12 @@ export function TranscriptWorkbench({ videoKey, config, onConfig, onRunId, onDir
     return () => { active = false; };
   }, [rid, onError, onRunId]);
   const reload = async () => { setRun(await request<Run>(`/api/runs/${rid}`)); window.dispatchEvent(new Event('bililm-source-updated')); };
+  useEffect(() => {
+    if (rid && job?.status === 'completed' && job.stage.startsWith('AI校对') && completedProofread.current !== job.id) {
+      completedProofread.current = job.id;
+      void reload().catch(e => onError((e as Error).message));
+    }
+  }, [job?.id, job?.status, rid]);
   const act = async (action: () => Promise<void>) => { setBusy(true); try { await action(); } catch (e) { onError((e as Error).message); } finally { setBusy(false); } };
   function play(start: number, end?: number) {
     if (!audio.current) { onError('历史版本没有保留音轨。请重新转录或提供原文件。'); return; }
@@ -70,7 +77,9 @@ export function TranscriptWorkbench({ videoKey, config, onConfig, onRunId, onDir
     <div className="transcript-scroll">
       {!run ? <p className="muted">正在加载转录记录…</p> : <><details className="run-info"><summary>模型、执行信息与修改日志</summary><pre>{JSON.stringify({ config: run.config, execution: run.metrics, provenance: run.provenance, change_log: run.change_log }, null, 2)}</pre><a href={`/api/runs/${rid}/export?format=json`}>导出全部元数据与日志</a></details>
         {view === 'raw' && <p className="provenance-note">不可覆盖的原始输出。诊断低分不代表已证实错误，请重听核对。</p>}
-        {view === 'proofread' && <><p className="provenance-note">文本校对建议未经听音验证。只有人工接受的修改进入校对稿。</p><button className="secondary" disabled={!llmConfigured || busy || dirty} onClick={() => void act(async () => { if (!confirm('将当前文字与词表发送给已配置的 LLM，生成待人工审核建议？')) return; await request(`/api/runs/${rid}/proofread`, {}); await reload(); })}>生成保守文本校对建议</button>{!llmConfigured && <p className="muted">未配置 LLM，仍可人工逐段校对。</p>}
+        {(view === 'proofread' || view === 'readable') && <AIProofreadingPanel key={run.id} run={run} configured={llmConfigured} blocked={busy || dirty} job={job} reload={reload} onMessage={onMessage} />}
+        {view === 'proofread' && <><p className="provenance-note">校对稿可能含规则约束的 AI 自动修改与人工接受的建议，均未经听音验证；原始稿独立保留。</p><button className="secondary" disabled={!llmConfigured || busy || dirty} onClick={() => void act(async () => { if (!confirm('将当前文字与词表发送给已配置的 LLM，生成待人工审核建议？')) return; await request(`/api/runs/${rid}/proofread`, {}); await reload(); })}>生成保守文本校对建议</button>{!llmConfigured && <p className="muted">未配置 LLM，仍可人工逐段校对。</p>}
+          {run.corrections.some(p => p.state === 'auto-applied') && <details className="ai-applied-changes"><summary>查看 AI 自动修改前后（未听音验证）</summary>{run.corrections.filter(p => p.state === 'auto-applied').map(p => <div className="correction" key={p.id}><strong>{time(run.raw[p.segment_index].start)} · AI 自动修改</strong><del>{p.before_text}</del><ins>{p.after_text}</ins><p>{p.reason}</p><button onClick={() => play(run.raw[p.segment_index].start, run.raw[p.segment_index].end)}>重听核对</button></div>)}</details>}
           {run.corrections.filter(p => p.state === 'pending').map(p => <div className="correction" key={p.id}><strong>待人工复核 · {time(run.raw[p.segment_index].start)}</strong><del>{p.before_text}</del><ins>{p.after_text}</ins><p>{p.reason}</p><button onClick={() => play(run.raw[p.segment_index].start, run.raw[p.segment_index].end)}>重听</button><button disabled={busy || dirty} onClick={() => void act(async () => { await request(`/api/runs/${rid}/corrections/${p.id}/review`, { accept: true }); await reload(); })}>接受</button><button disabled={busy || dirty} onClick={() => void act(async () => { await request(`/api/runs/${rid}/corrections/${p.id}/review`, { accept: false }); await reload(); })}>保留原文</button></div>)}
         </>}
         {view === 'readable' && <div className="readable-actions"><label><input type="checkbox" checked={removeFiller} onChange={e => setRemoveFiller(e.target.checked)} /> 仅移除片段开头明确的“嗯/呃”停顿词</label><button className="text-button" disabled={busy || dirty} onClick={() => void act(async () => { if (!confirm('从当前校对稿重新生成可读稿？现有可读稿修改会记录并替换，原稿不变。')) return; await request(`/api/runs/${rid}/readable/format`, { revision: run.readable_revision, remove_filler: removeFiller }); await reload(); })}>从校对稿整理</button></div>}

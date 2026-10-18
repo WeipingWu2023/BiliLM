@@ -32,6 +32,16 @@ def process(job):
         db.update_job(jid,_lease_token=token,progress=value,stage=stage)
     adapter = None
     try:
+        if payload['kind']=='proofread':
+            from . import proofreading
+            current=versions.get(payload['rid']); options=payload['options']
+            if not current or current['proof_revision']!=options['proof_revision'] or current['readable_revision']!=options['readable_revision']:
+                raise ValueError('文稿版本已变化，未发出校对请求；请重新提交')
+            result=proofreading.prepare(current['proofread'],db.get_video(key)['title'],
+                       options.get('topic') or current['config'].get('topic',''),options.get('glossary') or current['config'].get('glossary',''),
+                       options.get('use_search',False),progress,current['metrics'].get('detected_language') or current['config'].get('language','auto'))
+            proofreading.apply(payload['rid'],result,options['proof_revision'],options['readable_revision'],job)
+            return
         if versions.get(jid):
             db.update_job(jid,_lease_token=token,status='completed',progress=100,stage='已从缓存恢复')
             return
@@ -88,7 +98,18 @@ def process(job):
                 rows=backend.transcribe(source,config,progress,metrics,playback)
                 provenance='bilibili-asr:'+config['model']
         rows=validate_segments(rows)
-        progress(97,'保存原稿与可读稿')
+        proofreading = None
+        if config.get('ai_proofread'):
+            try:
+                from .proofreading import prepare
+                proofreading=prepare(rows,metadata['title'],config.get('topic',''),config.get('glossary',''),
+                                     config.get('proofread_search',False),progress,metrics.get('detected_language') or config.get('language','auto'))
+                metrics['ai_proofreading']=proofreading['summary']
+            except Exception:
+                # External text correction must never discard a successful ASR result.
+                metrics['ai_proofreading']={'status':'failed','audio_verified':False,'notice':'AI 校对失败；原始转录已保存，请稍后在校对稿重试'}
+                logging.warning('AI proofreading failed for job %s; preserving ASR output',jid)
+        progress(97,'保存独立原稿、校对稿与可读稿')
         if source and source.exists():
             digest=hashlib.sha256()
             with source.open('rb') as file:
@@ -97,7 +118,7 @@ def process(job):
             metrics['source_audio_sha256']=digest.hexdigest()
         versions.commit_job(job,metadata,rows,provenance,config,metrics,
                             source.relative_to(db.DATA).as_posix() if source and source.exists() else None,
-                            playback.relative_to(db.DATA).as_posix() if playback.exists() else None)
+                            playback.relative_to(db.DATA).as_posix() if playback.exists() else None,proofreading)
     except db.LeaseLost:
         logging.warning('Lease lost for job %s; result not committed',jid)
     except Exception as exc:

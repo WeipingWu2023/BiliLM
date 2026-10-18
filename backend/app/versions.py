@@ -54,15 +54,19 @@ def create(rid, key, rows, provenance, config, metrics, audio=None, playback=Non
         _insert(con,rid,key,rows,provenance,config,metrics,audio,playback)
 
 
-def commit_job(job,metadata,rows,provenance,config,metrics,audio=None,playback=None):
+def commit_job(job,metadata,rows,provenance,config,metrics,audio=None,playback=None,proofreading=None):
     with db.connection() as con:
         con.execute('BEGIN IMMEDIATE'); db.fence(con,job['id'],job.get('lease_token'))
         _insert(con,job['id'],job['video_id'],rows,provenance,config,metrics,audio,playback)
+        if proofreading:
+            from .proofreading import apply_in_transaction
+            apply_in_transaction(con,job['id'],proofreading)
         con.execute('UPDATE videos SET title=?,creator=?,thumbnail=?,duration=? WHERE id=?',
                     (metadata['title'],metadata.get('creator',''),metadata.get('thumbnail',''),metadata.get('duration',0),job['video_id']))
         con.execute('UPDATE videos SET segments=?,readable=?,provenance=? WHERE id=? AND segments IS NULL',
-                    (json.dumps(rows,ensure_ascii=False),clean(rows),provenance,job['video_id']))
-        con.execute("UPDATE jobs SET status='completed',progress=100,stage='转录完成' WHERE id=?",(job['id'],))
+                    (json.dumps(rows,ensure_ascii=False),proofreading['readable'] if proofreading else clean(rows),provenance,job['video_id']))
+        stage = '转录与 AI 校对完成（非听音验证）' if proofreading else '原稿已保存；AI 校对失败，可稍后重试' if metrics.get('ai_proofreading',{}).get('status')=='failed' else '转录完成'
+        con.execute("UPDATE jobs SET status='completed',progress=100,stage=? WHERE id=?",(stage,job['id']))
 
 
 def get(rid):
@@ -78,6 +82,8 @@ def get(rid):
             result[field] = json.loads(result[field])
         result['corrections'] = [dict(r) for r in con.execute('SELECT * FROM corrections WHERE run_id=? ORDER BY created_at,rowid',(rid,))]
         result['change_log'] = [dict(r) for r in con.execute('SELECT * FROM change_log WHERE run_id=? ORDER BY id',(rid,))]
+        relevant=[r for r in result['change_log'] if r['event'] in ('ai-proofread','undo-ai-proofread')]
+        result['proofreading'] = json.loads(relevant[-1]['details']).get('summary') if relevant and relevant[-1]['event']=='ai-proofread' else None
     return result
 
 

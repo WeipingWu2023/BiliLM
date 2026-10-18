@@ -85,6 +85,10 @@ def install(name, authorized):
 
 
 def ensure_ready(config):
+    if config.get('ai_proofread'):
+        from .llm_settings import public
+        if not public()['configured']:
+            raise ValueError('请先在来源问答配置 DeepSeek，或取消转录后 AI 校对；仍可只做本地转录')
     name=config['model']
     if name=='SenseVoiceSmall':
         row=next(item for item in catalog() if item['model']==name)

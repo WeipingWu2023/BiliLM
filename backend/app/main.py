@@ -206,7 +206,7 @@ def retranscribe(key: str, body: ASRConfig):
     except ValueError as exc:
         raise HTTPException(400,str(exc))
     with db.connection() as con:
-        old = con.execute('SELECT payload FROM jobs WHERE video_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',(key,)).fetchone()
+        old = con.execute("SELECT payload FROM jobs WHERE video_id=? AND json_extract(payload,'$.kind') IN ('bilibili','local') ORDER BY created_at DESC,rowid DESC LIMIT 1",(key,)).fetchone()
     if not old:
         raise HTTPException(409,'没有可恢复的来源，请重新导入原文件')
     payload = json.loads(old['payload'])
@@ -259,6 +259,41 @@ def proofread(rid: str):
 
 class ReviewRequest(BaseModel):
     accept: bool
+
+
+class ProofreadPipelineRequest(BaseModel):
+    proof_revision: int
+    readable_revision: int
+    use_search: bool = False
+    topic: str = Field(default='',max_length=300)
+    glossary: str = Field(default='',max_length=2000)
+
+
+@app.post('/api/runs/{rid}/proofread/pipeline')
+def proofread_pipeline(rid: str, body: ProofreadPipelineRequest):
+    current=run_or_404(rid)
+    if current['proof_revision']!=body.proof_revision or current['readable_revision']!=body.readable_revision:
+        raise HTTPException(409,'文稿版本已变化，请重新加载')
+    from . import proofreading
+    try:
+        from .llm_settings import public
+        if not public()['configured']: raise ValueError('请先配置 DeepSeek，再运行 AI 校对')
+        return {'job_id':proofreading.enqueue(rid,body.model_dump())}
+    except ValueError as exc:
+        raise HTTPException(400,str(exc))
+    except Exception:
+        raise HTTPException(502,'AI 语境校对失败，原稿和已有文稿未改变；请检查服务配置后重试')
+
+
+@app.post('/api/runs/{rid}/proofread/undo')
+def undo_proofread(rid: str):
+    run_or_404(rid)
+    from .proofreading import undo
+    try:
+        undo(rid)
+        return {'ok':True}
+    except ValueError as exc:
+        raise HTTPException(409,str(exc))
 
 
 @app.post('/api/runs/{rid}/corrections/{cid}/review')

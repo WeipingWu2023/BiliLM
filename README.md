@@ -6,9 +6,9 @@
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.1.2** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.2.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.1.2) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.2.0) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
@@ -23,6 +23,8 @@
 
 v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点与时间戳字号。[200% 文字特写](docs/assets/mindmap-text-200.png)。
 
+![AI 语境校对面板（合成界面测试，不是准确率证据）](docs/assets/proofreading-panel.png)
+
 </details>
 
 ## 可以做什么
@@ -35,6 +37,7 @@ v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点�
 | 本地音视频导入 | MP3/MP4/WAV/M4A/FLAC/OGG/WEBM/MKV/AAC，最大 1 GB |
 | small / medium / large-v3 / turbo | 可配置，模型缓存独立管理；大模型需明确下载 |
 | 原始稿 / 校对稿 / 可读稿 | 原稿不可覆盖，编辑独立保存，保留时间映射和日志 |
+| AI 语境校对 → 可读稿 | 可选 DeepSeek 专名校对及联网拼写核对，受规则约束的自动修改、待重听建议、撤销与日志；[使用方法与验证记录](docs/AI-PROOFREADING.md) |
 | 搜索、复制、TXT / SRT / Markdown / JSON 导出 | 支持；可读稿 Markdown 不附原始时间轴 |
 | 来源问答、自动总结、Studio 思维导图 | DeepSeek 或兼容接口；自备 Key，可能产生费用 |
 | 无 Key 使用 | 本地转录、编辑、导出、原文检索和原句提要可用 |
