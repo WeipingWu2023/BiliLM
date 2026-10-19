@@ -27,7 +27,7 @@ Linux 开发路径：安装 Python 3.12/venv、Node 22+、FFmpeg，使用 `pytho
 - 发布隐私检查：在根目录 `python scripts/check_release.py`；检查 Git 跟踪文件，不读取私有运行目录。
 - GitHub Actions 在 Windows/Linux 跑后端和隐私检查，并在 Linux 做干净 npm 安装、类型检查、生产构建、依赖审计。它不测真实平台访问和模型准确率。
 
-`scripts/*-ui-check.cjs` 是开发期浏览器回归脚本：需要自行安装 Playwright 和 Edge，可用 `BILILM_PLAYWRIGHT` 指向模块位置。某些脚本依赖本地既有测试笔记，并非面向全新安装的通用冒烟测试。AI 路径使用浏览器模拟或本地模式，不应意外消耗真实 API 费用。
+浏览器回归需要 Playwright 和 Edge，可用 `BILILM_PLAYWRIGHT` 指向模块位置。`scripts/final-workflow-ui-check.cjs` 覆盖自动生成到最终稿下载、编辑、问答、导图与失败恢复；`mindmap-ui-check.cjs` 覆盖画布交互。两者使用合成夹具拦截 API，不调用真实付费服务。旧的原稿/校对稿标签测试已由新版最终稿流程测试取代。不要在真实私有来源上随意运行旧版浏览器脚本，以免触发默认自动 AI 流程。
 
 真实 ASR 验收可使用 `scripts/smoke.py`；它会导入来源、等待识别并检查缓存/导出，因此仅在明确选择授权来源、模型和下载预算后手动运行。客观评测先准备人工真值，见 benchmarks/README.md。
 

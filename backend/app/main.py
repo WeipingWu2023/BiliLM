@@ -59,6 +59,7 @@ class ChatContext(BaseModel):
 class Question(BaseModel):
     question: str = Field(min_length=1,max_length=2000)
     external: bool = False
+    final: bool = False
     run_id: str | None = None
     history: list[ChatContext] = Field(default_factory=list,max_length=8)
 
@@ -67,6 +68,7 @@ class LearningRequest(BaseModel):
     kind: Literal['summary','mindmap']
     run_id: str | None = None
     external: bool = False
+    final: bool = False
     refresh: bool = False
 
 
@@ -122,7 +124,9 @@ def import_video(body: ImportRequest):
     # ASRConfig validates backend/model pairs, including the optional cached SenseVoice backend.
     try:
         from .model_manager import ensure_ready
-        ensure_ready(body.model_dump())
+        from .proofreading import automatic_config
+        settings=automatic_config(body.model_dump(exclude={'source'}))
+        ensure_ready(settings)
         bv, part = resolve(body.source)
     except ValueError as exc:
         raise HTTPException(400,str(exc))
@@ -130,14 +134,15 @@ def import_video(body: ImportRequest):
         raise HTTPException(502,'短链接访问失败；请粘贴完整 BV 链接。'+str(exc)[:200])
     key = f'{bv}:p{part}'
     return db.enqueue(key,f'https://www.bilibili.com/video/{bv}/?p={part}',bv,
-                      {'kind':'bilibili','bv':bv,'part':part,'model':body.model,'config':body.model_dump(exclude={'source'})})
+                      {'kind':'bilibili','bv':bv,'part':part,'model':body.model,'config':settings})
 
 
 @app.post('/api/uploads')
 async def upload(file: UploadFile = File(...), model: str = Form('small'), config: str = Form('{}')):
     import json
     try:
-        settings = ASRConfig.model_validate({'model':model,**json.loads(config)}).model_dump()
+        from .proofreading import automatic_config
+        settings = automatic_config(ASRConfig.model_validate({'model':model,**json.loads(config)}).model_dump())
         model = settings['model']
         from .model_manager import ensure_ready
         ensure_ready(settings)
@@ -202,7 +207,9 @@ def retranscribe(key: str, body: ASRConfig):
     video = video_or_404(key)
     from .model_manager import ensure_ready
     try:
-        ensure_ready(body.model_dump())
+        from .proofreading import automatic_config
+        settings=automatic_config(body.model_dump())
+        ensure_ready(settings)
     except ValueError as exc:
         raise HTTPException(400,str(exc))
     with db.connection() as con:
@@ -210,7 +217,7 @@ def retranscribe(key: str, body: ASRConfig):
     if not old:
         raise HTTPException(409,'没有可恢复的来源，请重新导入原文件')
     payload = json.loads(old['payload'])
-    payload.update({'model':body.model,'config':body.model_dump(),'retranscribe':True})
+    payload.update({'model':body.model,'config':settings,'retranscribe':True})
     try:
         return db.enqueue(key,video['url'],video['title'],payload)
     except ValueError as exc:
@@ -229,9 +236,51 @@ def run(rid: str):
     return run_or_404(rid)
 
 
+class FinalizeRequest(BaseModel):
+    retry: bool = False
+
+
+@app.post('/api/videos/{key}/finalize')
+def finalize_video(key: str, body: FinalizeRequest):
+    video_or_404(key)
+    from .proofreading import final_state
+    try:
+        return final_state(key,schedule=True,retry=body.retry)
+    except ValueError as exc:
+        raise HTTPException(409,str(exc))
+
+
+def final_or_409(key):
+    from .proofreading import final_state
+    state=final_state(key)
+    if state['status']!='ready': raise HTTPException(409,state['message'])
+    return state
+
+
+@app.get('/api/videos/{key}/final/export')
+def export_final(key: str, format: Literal['txt','md','srt'] = 'md'):
+    video=video_or_404(key); state=final_or_409(key)
+    content=export({**video,'segments':state['segments'],'readable':state['readable']},format)
+    return Response(content,media_type='text/plain; charset=utf-8',headers={'Content-Disposition':f'attachment; filename="bililm-final.{format}"'})
+
+
 class VersionEdit(BaseModel):
     texts: list[str] = Field(max_length=100000)
     revision: int
+
+
+class FinalEdit(VersionEdit):
+    run_id: str
+
+
+@app.put('/api/videos/{key}/final')
+def edit_final_video(key: str, body: FinalEdit):
+    video_or_404(key)
+    from .proofreading import edit_final
+    try:
+        return edit_final(key,body.texts,body.revision,body.run_id)
+    except ValueError as exc:
+        raise HTTPException(409,str(exc))
 
 
 @app.put('/api/runs/{rid}/{version}')
@@ -450,6 +499,7 @@ def retry(jid: str):
 @app.post('/api/videos/{key}/ask')
 def ask(key: str, body: Question):
     video = video_or_404(key)
+    if body.final: body.run_id=final_or_409(key)['run_id']
     try:
         from .learning import source
         video['segments'],_=source(video,body.run_id)
@@ -465,6 +515,7 @@ def ask(key: str, body: Question):
 @app.post('/api/videos/{key}/learning')
 def learning_artifact(key: str, body: LearningRequest):
     video=video_or_404(key)
+    if body.final: body.run_id=final_or_409(key)['run_id']
     try:
         from .learning import artifact
         return artifact(video,body.kind,body.run_id,body.external,body.refresh)

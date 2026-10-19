@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defaultSettings, QualityControls } from './quality-controls';
-import { TranscriptWorkbench } from './transcript-workbench';
+import { TranscriptWorkbench } from './final-transcript';
 import { LearningWorkspace } from './learning-workspace';
 import { GroundTruthWorkspace } from './ground-truth-workspace';
 import { IconArrowLeft, IconArrowRight, IconBook2, IconCheck, IconChevronRight, IconCopy, IconDownload, IconFileText, IconFolder, IconLink, IconMessageCircle, IconMoon, IconPlus, IconSearch, IconSend, IconShieldLock, IconSun, IconUpload, IconVideo } from '@tabler/icons-react';
@@ -96,7 +96,7 @@ export default function Page() {
         result = await api('/api/uploads', { method: 'POST', body: form });
       } else result = await api('/api/imports', json({ source, ...settings, model }));
       setGroundTruthOpen(false); setSelected(result.video_id); setSource(''); await refresh();
-      setNotice(result.cached ? '已打开本地缓存。要使用新选择的模型，请到“文稿核对”点击“重新转录”。' : '已加入本地队列。你可以离开此页面，任务会继续运行。');
+      setNotice(result.cached ? '已打开笔记，系统将自动准备最终文稿。' : '已加入本地队列。你可以离开此页面，任务会继续运行。');
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); if (upload.current) upload.current.value = ''; }
   }
@@ -138,12 +138,12 @@ export default function Page() {
     {notice && <div className="banner notice" role="status"><IconCheck size={17} /><span>{notice}</span><button onClick={() => setNotice('')}>关闭</button></div>}
     <input ref={upload} type="file" hidden accept=".mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm,.mkv,.aac" onChange={e => e.target.files?.[0] && void importSource(e.target.files[0])} />
     {groundTruthOpen ? <GroundTruthWorkspace onExit={() => navigate(null)} onDirty={setVersionDirty} onError={setError} onMessage={setNotice} /> : !selected ? <div className="home-layout">
-      <nav className="home-nav" aria-label="主导航"><button className="nav-active"><IconFolder size={20} /> 我的资料库 <span>{library.length}</span></button><button onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={20} /> 导入新视频</button><div className="nav-bottom"><IconShieldLock size={19} /><p>你的内容，留在本地。<small>转录与编辑无需云端账号</small></p></div></nav>
+      <nav className="home-nav" aria-label="主导航"><button className="nav-active"><IconFolder size={20} /> 我的资料库 <span>{library.length}</span></button><button onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={20} /> 导入新视频</button><div className="nav-bottom"><IconShieldLock size={19} /><p>你的笔记，本地保存。<small>AI 校对使用已配置 DeepSeek</small></p></div></nav>
       <main className="home-main">
-        <section className="import-section"><div className="hero-top"><div className="hero-copy"><div className="eyebrow">从观看，到理解</div><h1>让每一段视频，<br />成为你的学习笔记。</h1><p className="intro">导入 B 站视频，保留原声里的每一句话。<br className="mobile-hide" />用时间轴阅读、整理，在自己的节奏里探索。</p></div><figure className="hero-character"><img src="/images/miku-bust-v3.png" alt="初音未来微笑着抱书的透明半身插画" width={1254} height={1254} fetchPriority="high" /><figcaption>初音未来 · 学习伙伴</figcaption></figure></div>
+        <section className="import-section"><div className="hero-top"><div className="hero-copy"><div className="eyebrow">从观看，到理解</div><h1>让每一段视频，<br />成为你的学习笔记。</h1><p className="intro">导入 B 站视频，保留原声里的每一句话。<br className="mobile-hide" />自动转录、AI 校对与总结，直接阅读和下载。</p></div><figure className="hero-character"><img src="/images/miku-bust-v3.png" alt="初音未来微笑着抱书的透明半身插画" width={1254} height={1254} fetchPriority="high" /><figcaption>初音未来 · 学习伙伴</figcaption></figure></div>
           <form className="import-box" onSubmit={e => { e.preventDefault(); void importSource(); }}><IconLink className="input-symbol" size={21} /><input id="source-input" aria-label="B站视频链接或 BV 号" placeholder="粘贴 B 站链接或 BV 号…" required value={source} onChange={e => setSource(e.target.value)} /><button className="primary" disabled={busy || !source.trim()}>{busy ? '正在导入…' : '导入视频'}<IconArrowRight size={18} /></button></form>
           <div className="import-options"><button className="text-button" disabled={busy} onClick={() => upload.current?.click()}><IconUpload size={16} /> 导入已授权的本地文件</button><span className="option-divider" /><label>识别模型 <select aria-label="识别模型" value={model} onChange={e => { setError(''); setModel(e.target.value); setSettings({ ...settings, backend: e.target.value === 'SenseVoiceSmall' ? 'sensevoice' : 'faster-whisper', allow_model_download: false }); }}>{['tiny','base','small','medium','large-v3','turbo','SenseVoiceSmall'].map(m => <option key={m} value={m}>{m === 'SenseVoiceSmall' ? 'SenseVoiceSmall · 可选后端' : m}</option>)}</select></label></div>
-          <div className="import-hint">优先读取可访问字幕；无字幕时使用本地语音识别。仅导入你有权使用的内容。</div>
+          <div className="import-hint">自动转录 → AI 校对 → 完整文稿与总结。仅导入你有权使用的内容。</div>
           <QualityControls value={{ ...settings, model }} onChange={next => { setSettings(next); setModel(next.model); }} />
           {health && !health.ffmpeg && <p className="error-text">未检测到 FFmpeg。本地转录前请完成安装。</p>}
         </section>

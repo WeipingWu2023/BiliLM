@@ -30,6 +30,7 @@ const path = require('node:path');
       else if (endpoint === '/api/health') json = { status: 'ok', ffmpeg: true, llm_configured: false };
       else if (endpoint === '/api/llm/settings') json = { configured: false, key_saved: false, auto_enabled: false, model: 'fixture' };
       else if (endpoint === '/api/videos/' + video.id) json = video;
+      else if (endpoint.endsWith('/finalize')) json = {status:'ready',run_id:run.id,revision:0,segments:rows,readable:video.readable,playback:false,message:'文稿已自动校对'};
       else if (endpoint === '/api/runs/' + run.id) json = run;
       else if (endpoint.endsWith('/learning/artifacts')) json = [map, summary];
       else if (endpoint.endsWith('/learning')) json = body?.kind === 'mindmap' ? map : summary;

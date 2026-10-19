@@ -39,7 +39,7 @@ def process(job):
                 raise ValueError('文稿版本已变化，未发出校对请求；请重新提交')
             result=proofreading.prepare(current['proofread'],db.get_video(key)['title'],
                        options.get('topic') or current['config'].get('topic',''),options.get('glossary') or current['config'].get('glossary',''),
-                       options.get('use_search',False),progress,current['metrics'].get('detected_language') or current['config'].get('language','auto'))
+                       options.get('use_search',False),progress,current['metrics'].get('detected_language') or current['config'].get('language','auto'),policy=options.get('policy','conservative'))
             proofreading.apply(payload['rid'],result,options['proof_revision'],options['readable_revision'],job)
             return
         if versions.get(jid):
@@ -103,7 +103,7 @@ def process(job):
             try:
                 from .proofreading import prepare
                 proofreading=prepare(rows,metadata['title'],config.get('topic',''),config.get('glossary',''),
-                                     config.get('proofread_search',False),progress,metrics.get('detected_language') or config.get('language','auto'))
+                                     config.get('proofread_search',False),progress,metrics.get('detected_language') or config.get('language','auto'),policy='automatic-v1' if config.get('auto_finalize') else 'conservative')
                 metrics['ai_proofreading']=proofreading['summary']
             except Exception:
                 # External text correction must never discard a successful ASR result.

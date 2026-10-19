@@ -18,6 +18,7 @@ class ASRConfig(BaseModel):
     topic: str = Field(default='',max_length=300)
     glossary: str = Field(default='',max_length=2000)
     ai_proofread: bool = False
+    auto_finalize: bool = False
     proofread_search: bool = False
     vad_filter: bool = True
     vad_threshold: float = Field(default=0.5,ge=0.1,le=0.9)

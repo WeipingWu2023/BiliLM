@@ -2,13 +2,13 @@
 
 **把视频，变成你的学习笔记。**
 
-本地优先的 B 站学习工作台：从可访问字幕或授权音视频获得文字稿，保留原稿与时间戳，再进行文稿核对、来源问答、总结和思维导图。
+本地优先的 B 站学习工作台：从可访问字幕或授权音视频自动转录，经 AI 校对和复查，直接获得完整文稿、来源问答、总结和思维导图。
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.2.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.3.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.2.0) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.3.0) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
@@ -23,7 +23,7 @@
 
 v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点与时间戳字号。[200% 文字特写](docs/assets/mindmap-text-200.png)。
 
-![AI 语境校对面板（合成界面测试，不是准确率证据）](docs/assets/proofreading-panel.png)
+![自动生成的最终文稿（合成界面测试，不是准确率证据）](docs/assets/final-transcript.png)
 
 </details>
 
@@ -36,11 +36,11 @@ v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点�
 | 字幕优先 → 音轨提取 → 本地 ASR | 支持；不会绕过登录、付费、验证码或 DRM |
 | 本地音视频导入 | MP3/MP4/WAV/M4A/FLAC/OGG/WEBM/MKV/AAC，最大 1 GB |
 | small / medium / large-v3 / turbo | 可配置，模型缓存独立管理；大模型需明确下载 |
-| 原始稿 / 校对稿 / 可读稿 | 原稿不可覆盖，编辑独立保存，保留时间映射和日志 |
-| AI 语境校对 → 可读稿 | 可选 DeepSeek 专名校对及联网拼写核对，受规则约束的自动修改、待重听建议、撤销与日志；[使用方法与验证记录](docs/AI-PROOFREADING.md) |
-| 搜索、复制、TXT / SRT / Markdown / JSON 导出 | 支持；可读稿 Markdown 不附原始时间轴 |
+| 单一最终文稿 | 自动校对、复查和整理；直接阅读、编辑与下载，初稿和日志在后台保留 |
+| 默认自动 AI 校对 | 配置一次 DeepSeek 后自动执行，不需要校对开关或接受建议；[使用方法与验证记录](docs/AI-PROOFREADING.md) |
+| 搜索、复制、TXT / SRT / Markdown 导出 | 直接下载最终稿，Markdown 不附原始时间轴；后台元数据 API 保留 |
 | 来源问答、自动总结、Studio 思维导图 | DeepSeek 或兼容接口；自备 Key，可能产生费用 |
-| 无 Key 使用 | 本地转录、编辑、导出、原文检索和原句提要可用 |
+| 未配置 Key | 可先本地转录；最终稿和学习内容等待一次 DeepSeek 配置 |
 | 队列、重试、资料库、缓存、多次转录记录 | SQLite 持久保存 |
 | ASR 客观评测、人工真值标注 | 工具已具备；9 个空槽位，尚无人工核对样本 |
 | SenseVoiceSmall | 可选后端，Windows CPU 短片段可用性已验证；准确率未测 |
@@ -123,10 +123,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install-models.ps1 -Includ
 在来源问答底部点击 **DeepSeek 设置**，填写自己的 API Key 和账户可用模型名，再点击**保存并启用 DeepSeek**。密钥不用发给任何人。接口模型可能调整，以你的服务账户为准。
 
 - ASR 默认在本机运行；获取 B 站元数据/媒体、安装依赖和下载模型需要联网。
-- **启用 AI 后，来源文字会发往配置的服务，并可能产生 API 费用。** 取消 AI 开关可回到本地模式；启用时打开来源会自动生成/读取总结。
+- **配置后会默认自动调用 AI，来源文字会发往服务，并可能产生 API 费用。** 不再需要逐次开启校对或总结；未配置时不将初稿作为最终稿发布。
 - 密钥存在本机 `data/llm-settings.json`，不是加密保险库。不要共享整个 `data`、配置文件或日志。读取设置接口不会回显密钥。
 - 引用编号校验可以防止指向不存在的片段，不能证明回答语义正确，更不能证明听音准确。
-- 文本校对只提供待人工核对的建议。原始稿不被 AI 静默覆盖。
+- 文本校对和候选复查自动执行；依据不足的表达保留原词，原始内容与日志在后台独立保存。
 
 兼容服务也可通过启动前的环境变量 `BILILM_LLM_URL`、`BILILM_LLM_MODEL`、`BILILM_LLM_KEY` 配置。URL 为 Chat Completions 基地址，如包含 `/v1` 则保留；本机保存的 DeepSeek 配置优先。项目不会自动读取 `.env`。
 
