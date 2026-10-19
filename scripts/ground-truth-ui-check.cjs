@@ -14,19 +14,7 @@ const fs = require('node:fs');
   try {
     await page.goto('http://127.0.0.1:3000');
     await page.getByRole('heading', { name: '我的资料库' }).waitFor();
-    await page.locator('.hero-character img').evaluate(img => img.decode());
-    const asset = await page.locator('.hero-character').evaluate(el => {
-      const img = el.querySelector('img'), canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-      const context = canvas.getContext('2d'); context.drawImage(img, 0, 0);
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      let borderPixels = 0;
-      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
-        if ((x === 0 || y === 0 || x === canvas.width - 1 || y === canvas.height - 1) && pixels[(y * canvas.width + x) * 4 + 3]) borderPixels++;
-      }
-      return { background: getComputedStyle(el).backgroundColor, fit: getComputedStyle(img).objectFit, borderPixels, source: img.getAttribute('src') };
-    });
-    assert(asset.background === 'rgba(0, 0, 0, 0)' && asset.fit === 'contain' && asset.source.endsWith('bust-v3.png'), 'Character must use the transparent upper-body asset with contain');
+    assert(await page.locator('.hero-character').count() === 0, 'Homepage illustration should be removed');
     await noOverflow(); await page.screenshot({ path: path.join(out, 'phase2-home-desktop.png'), fullPage: true });
     await page.locator('.quality-controls summary').click();
     const optional = page.getByLabel('识别后端', { exact: true }).locator('option[value="sensevoice"]');
@@ -68,6 +56,6 @@ const fs = require('node:fs');
     await page.setViewportSize({ width: 390, height: 844 }); await noOverflow();
     await page.screenshot({ path: path.join(out, 'ground-truth-mobile.png'), fullPage: true });
     assert(!errors.length, errors.join('\n')); assert(!mutations.length, 'Read-only UI check unexpectedly mutated data');
-    console.log(JSON.stringify({ status: 'passed', slots: 9, errors, mutations, transparent_character: asset, screenshots: out }));
+    console.log(JSON.stringify({ status: 'passed', slots: 9, errors, mutations, homepage_character_removed: true, screenshots: out }));
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -6,9 +6,9 @@
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.3.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.3.1** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.3.0) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.3.1) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
