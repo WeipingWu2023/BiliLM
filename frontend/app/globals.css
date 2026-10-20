@@ -180,3 +180,13 @@ progress { accent-color:var(--accent); width:90px; height:5px; }
   .hero-copy .mobile-hide { display:none; }
   .import-section h1 { font-size:clamp(28px,7.4vw,36px); line-height:1.4; letter-spacing:-.7px; }
 }
+.library-tools { display:flex; align-items:center; gap:20px; }
+.video-card { position:relative; }
+.video-card-open { display:block; width:100%; padding:0; text-align:left; }
+.video-card-open:disabled { opacity:1; cursor:default; }
+.library-card-action { position:absolute; right:10px; top:10px; display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--muted); }
+.library-card-action:hover { color:var(--error); border-color:var(--error); }
+.library-card-action.restore-action:hover { color:var(--accent); border-color:var(--accent); }
+.deletion-notice>span { flex:1; overflow-wrap:anywhere; }
+.deletion-notice button { margin-left:0; }
+@media(max-width:767px) { .library-section>.section-heading { flex-wrap:wrap; }.library-tools { gap:12px; }.library-tools .text-button { font-size:11px; }.deletion-notice { flex-wrap:wrap; }.deletion-notice>span { min-width:65%; } }

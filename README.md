@@ -6,9 +6,9 @@
 
 ![BiliLM 宣传海报](docs/assets/bililm-poster.png)
 
-> **公开预览版 v0.3.1** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
+> **公开预览版 v0.4.0** · Windows 11 本机使用 · 中文界面。日常工作流已验证；尚无人工真值评测结果，不承诺识别准确率。上图为宣传示意。与 Bilibili、NotebookLM、DeepSeek 无官方隶属关系。
 
-[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.3.1) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
+[下载预览版](https://github.com/WeipingWu2023/BiliLM/releases/tag/v0.4.0) · [从零使用教程](docs/GETTING-STARTED-ZH.md) · [常见问题](docs/TROUBLESHOOTING.md) · [发布审计](docs/RELEASE-AUDIT.md) · [参与贡献](CONTRIBUTING.md)
 
 <details>
 <summary>查看真实界面（空资料库，不含私人来源）</summary>
@@ -42,6 +42,7 @@ v0.1.2 使用原生布局缩放改善放大时的文字清晰度，增大节点�
 | 来源问答、自动总结、Studio 思维导图 | DeepSeek 或兼容接口；自备 Key，可能产生费用 |
 | 未配置 Key | 可先本地转录；最终稿和学习内容等待一次 DeepSeek 配置 |
 | 队列、重试、资料库、缓存、多次转录记录 | SQLite 持久保存 |
+| 删除与恢复 | 卡片垃圾桶 → 确认 → 回收站；支持撤销与恢复，处理中任务取消并阻止旧任务写回 |
 | ASR 客观评测、人工真值标注 | 工具已具备；9 个空槽位，尚无人工核对样本 |
 | SenseVoiceSmall | 可选后端，Windows CPU 短片段可用性已验证；准确率未测 |
 

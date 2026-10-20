@@ -5,7 +5,7 @@ import { defaultSettings, QualityControls } from './quality-controls';
 import { TranscriptWorkbench } from './final-transcript';
 import { LearningWorkspace } from './learning-workspace';
 import { GroundTruthWorkspace } from './ground-truth-workspace';
-import { IconArrowLeft, IconArrowRight, IconBook2, IconCheck, IconChevronRight, IconCopy, IconDownload, IconFileText, IconFolder, IconLink, IconMessageCircle, IconMoon, IconPlus, IconSearch, IconSend, IconShieldLock, IconSun, IconUpload, IconVideo } from '@tabler/icons-react';
+import { IconArrowLeft, IconArrowRight, IconBook2, IconCheck, IconChevronRight, IconCopy, IconDownload, IconFileText, IconFolder, IconLink, IconMessageCircle, IconMoon, IconPlus, IconRestore, IconSearch, IconSend, IconShieldLock, IconSun, IconTrash, IconUpload, IconVideo } from '@tabler/icons-react';
 
 type Segment = { start: number; end: number; text: string };
 type Video = { id: string; title: string; creator: string; thumbnail: string; duration: number; provenance: string; ready?: number; status?: string; url: string; segments: Segment[]; readable: string; revision: number };
@@ -25,6 +25,10 @@ const json = (body: unknown, method = 'POST') => ({ method, headers: { 'Content-
 
 export default function Page() {
   const [library, setLibrary] = useState<Video[]>([]);
+  const [trashMode,setTrashMode] = useState(false);
+  const [removing,setRemoving] = useState('');
+  const [deleted,setDeleted] = useState<Pick<Video,'id'|'title'> | null>(null);
+  const libraryMode = useRef(false); libraryMode.current=trashMode;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [groundTruthOpen, setGroundTruthOpen] = useState(false);
@@ -60,10 +64,11 @@ export default function Page() {
 
   const refresh = useCallback(async () => {
     try {
-      const [videos, tasks] = await Promise.all([api<Video[]>('/api/videos'), api<Job[]>('/api/jobs')]);
+      const [videos, tasks] = await Promise.all([api<Video[]>(trashMode?'/api/videos?trash=true':'/api/videos'), api<Job[]>('/api/jobs')]);
+      if(libraryMode.current!==trashMode)return;
       setLibrary(videos); setJobs(tasks); setLoaded(true);
     } catch (e) { setError((e as Error).message + '。请确认本地服务已启动。'); }
-  }, []);
+  }, [trashMode]);
   useEffect(() => { void refresh(); const timer = setInterval(refresh, 2500); void api<typeof health>('/api/health').then(setHealth).catch(() => {}); return () => clearInterval(timer); }, [refresh]);
   useEffect(() => { const changed = () => { void api<typeof health>('/api/health').then(setHealth).catch(() => {}); }; window.addEventListener('bililm-provider-changed', changed); return () => window.removeEventListener('bililm-provider-changed', changed); }, []);
   useEffect(() => {
@@ -79,12 +84,28 @@ export default function Page() {
   }, [dirty]);
   function navigate(key: string | null) {
     if (dirty && !window.confirm('稿件尚未保存。要放弃这些修改吗？')) return;
+    switchLibrary(false);
     setGroundTruthOpen(false); setSelected(key); setNotice(''); setError('');
   }
   function openGroundTruth() {
     if (groundTruthOpen) return;
     if (dirty && !window.confirm('稿件尚未保存。要放弃这些修改吗？')) return;
     setSelected(null); setGroundTruthOpen(true); setNotice(''); setError('');
+  }
+  function switchLibrary(trash:boolean) {
+    if(trashMode===trash)return;
+    setTrashMode(trash);setLibrary([]);setLoaded(false);setLibraryQuery('');
+  }
+  async function deleteVideo(item:Video) {
+    if(!confirm(`将《${item.title}》移入回收站？\n处理中任务会取消，笔记可以恢复。`))return;
+    setRemoving(item.id);setError('');
+    try { await api(keyPath(item.id),{method:'DELETE'});if(libraryMode.current===trashMode)setLibrary(rows=>rows.filter(v=>v.id!==item.id));setDeleted({id:item.id,title:item.title});setNotice('');await refresh(); }
+    catch(e){setError((e as Error).message)} finally{setRemoving('')}
+  }
+  async function restoreVideo(id:string) {
+    setRemoving(id);setError('');
+    try{await api(keyPath(id)+'/restore',{method:'POST'});setDeleted(null);setNotice('笔记已恢复到资料库。');await refresh()}
+    catch(e){setError((e as Error).message)}finally{setRemoving('')}
   }
   async function importSource(file?: File) {
     if (dirty && !window.confirm('导入会离开当前稿件。要放弃未保存的修改吗？')) return;
@@ -95,7 +116,7 @@ export default function Page() {
         const form = new FormData(); form.append('file', file); form.append('model', model); form.append('config', JSON.stringify({ ...settings, model }));
         result = await api('/api/uploads', { method: 'POST', body: form });
       } else result = await api('/api/imports', json({ source, ...settings, model }));
-      setGroundTruthOpen(false); setSelected(result.video_id); setSource(''); await refresh();
+      setGroundTruthOpen(false); switchLibrary(false); setSelected(result.video_id); setSource(''); await refresh();
       setNotice(result.cached ? '已打开笔记，系统将自动准备最终文稿。' : '已加入本地队列。你可以离开此页面，任务会继续运行。');
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); if (upload.current) upload.current.value = ''; }
@@ -136,9 +157,10 @@ export default function Page() {
     </header>
     {error && <div className="banner error" role="alert"><span>{error}</span><button onClick={() => setError('')}>关闭</button></div>}
     {notice && <div className="banner notice" role="status"><IconCheck size={17} /><span>{notice}</span><button onClick={() => setNotice('')}>关闭</button></div>}
+    {deleted && <div className="banner notice deletion-notice" role="status"><IconTrash size={16}/><span>已将《{deleted.title}》移入回收站</span><button disabled={!!removing} onClick={()=>void restoreVideo(deleted.id)}>撤销删除</button><button aria-label="关闭删除提示" onClick={()=>setDeleted(null)}>关闭</button></div>}
     <input ref={upload} type="file" hidden accept=".mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm,.mkv,.aac" onChange={e => e.target.files?.[0] && void importSource(e.target.files[0])} />
     {groundTruthOpen ? <GroundTruthWorkspace onExit={() => navigate(null)} onDirty={setVersionDirty} onError={setError} onMessage={setNotice} /> : !selected ? <div className="home-layout">
-      <nav className="home-nav" aria-label="主导航"><button className="nav-active"><IconFolder size={20} /> 我的资料库 <span>{library.length}</span></button><button onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={20} /> 导入新视频</button><div className="nav-bottom"><IconShieldLock size={19} /><p>你的笔记，本地保存。<small>AI 校对使用已配置 DeepSeek</small></p></div></nav>
+      <nav className="home-nav" aria-label="主导航"><button className="nav-active" onClick={()=>switchLibrary(false)}><IconFolder size={20} /> 我的资料库 {!trashMode&&<span>{library.length}</span>}</button><button onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={20} /> 导入新视频</button><div className="nav-bottom"><IconShieldLock size={19} /><p>你的笔记，本地保存。<small>AI 校对使用已配置 DeepSeek</small></p></div></nav>
       <main className="home-main">
         <section className="import-section"><div className="hero-top"><div className="hero-copy"><div className="eyebrow">从观看，到理解</div><h1>让每一段视频，<br />成为你的<span className="hero-emphasis">学习笔记。</span></h1><p className="intro">导入 B 站视频，自动转录、AI 校对与总结。<br className="mobile-hide" />一份完整文稿，直接阅读和下载。</p></div></div>
           <form className="import-box" onSubmit={e => { e.preventDefault(); void importSource(); }}><IconLink className="input-symbol" size={21} /><input id="source-input" aria-label="B站视频链接或 BV 号" placeholder="粘贴 B 站链接或 BV 号…" required value={source} onChange={e => setSource(e.target.value)} /><button className="primary" disabled={busy || !source.trim()}>{busy ? '正在导入…' : '导入视频'}<IconArrowRight size={18} /></button></form>
@@ -148,8 +170,8 @@ export default function Page() {
           {health && !health.ffmpeg && <p className="error-text">未检测到 FFmpeg。本地转录前请完成安装。</p>}
         </section>
         {pending.length > 0 && <section className="queue-strip" aria-label="处理中任务">{pending.map(j => <button key={j.id} onClick={() => navigate(j.video_id)}><IconVideo size={19} /><span>{library.find(v => v.id === j.video_id)?.title}<small>{j.stage}</small></span><progress max={100} value={j.progress} /><b>{j.progress}%</b><IconChevronRight size={18} /></button>)}</section>}
-        <section className="library-section"><div className="section-heading"><h2>我的资料库 <span>{library.length}</span></h2><label className="search-box"><IconSearch size={17} /><input aria-label="搜索资料库" placeholder="搜索笔记" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)} /></label></div>
-          {!loaded ? <div className="skeleton-list" aria-label="资料库加载中"><div /><div /><div /></div> : library.length === 0 ? <div className="empty-library"><span className="empty-icon"><IconFileText size={29} /></span><div><h3>你的第一本视频笔记，从这里开始</h3><p>粘贴链接，或导入本地音视频。完成后会自动保存到资料库。</p></div><button className="icon-button" aria-label="开始导入" onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={24} /></button></div> : <div className="library-grid">{library.filter(v => v.title.toLowerCase().includes(libraryQuery.toLowerCase())).map(v => <button className="video-card" key={v.id} onClick={() => navigate(v.id)}><div className="cover">{v.thumbnail ? <img src={keyPath(v.id) + '/thumbnail'} onError={e => { e.currentTarget.style.visibility = 'hidden'; }} alt="" /> : <IconVideo size={36} />}<span>{v.duration ? time(v.duration) : v.id.startsWith('local:') ? '本地文件' : 'B 站视频'}</span></div><div className="card-copy"><div className="card-status">{v.ready ? '已保存' : v.status === 'failed' ? '需要处理' : '转录中'}<IconChevronRight size={16} /></div><h3>{v.title}</h3><p>{v.creator || '本地学习笔记'}<span>{v.provenance.includes('subtitle') ? '字幕' : v.ready ? '语音识别' : ''}</span></p></div></button>)}</div>}
+        <section className="library-section"><div className="section-heading"><h2>{trashMode?'回收站':'我的资料库'} <span>{library.length}</span></h2><div className="library-tools"><button className="text-button" onClick={()=>switchLibrary(!trashMode)}>{trashMode?<IconFolder size={16}/>:<IconTrash size={16}/>} {trashMode?'返回资料库':'回收站'}</button><label className="search-box"><IconSearch size={17} /><input aria-label="搜索资料库" placeholder="搜索笔记" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)} /></label></div></div>
+          {!loaded ? <div className="skeleton-list" aria-label="资料库加载中"><div /><div /><div /></div> : library.length === 0 ? <div className="empty-library"><span className="empty-icon">{trashMode?<IconTrash size={29}/>:<IconFileText size={29}/>}</span><div><h3>{trashMode?'回收站为空':'你的第一本视频笔记，从这里开始'}</h3><p>{trashMode?'删除的笔记会放在这里，可以随时恢复。':'粘贴链接，或导入本地音视频。完成后会自动保存到资料库。'}</p></div>{!trashMode&&<button className="icon-button" aria-label="开始导入" onClick={() => document.getElementById('source-input')?.focus()}><IconPlus size={24} /></button>}</div> : <div className="library-grid">{library.filter(v => v.title.toLowerCase().includes(libraryQuery.toLowerCase())).map(v => <article className="video-card" key={v.id}><button className="video-card-open" disabled={trashMode} onClick={() => navigate(v.id)} aria-label={`打开笔记：${v.title}`}><div className="cover">{v.thumbnail&&!trashMode ? <img src={keyPath(v.id) + '/thumbnail'} onError={e => { e.currentTarget.style.visibility = 'hidden'; }} alt="" /> : <IconVideo size={36} />}<span>{v.duration ? time(v.duration) : v.id.startsWith('local:') ? '本地文件' : 'B 站视频'}</span></div><div className="card-copy"><div className="card-status">{trashMode?'已删除':v.ready ? '已保存' : v.status === 'failed' ? '需要处理' : '转录中'}{!trashMode&&<IconChevronRight size={16}/>}</div><h3>{v.title}</h3><p>{v.creator || '本地学习笔记'}<span>{v.provenance.includes('subtitle') ? '字幕' : v.ready ? '语音识别' : ''}</span></p></div></button><button className={`library-card-action${trashMode?' restore-action':''}`} aria-label={`${trashMode?'恢复':'删除'}笔记：${v.title}`} title={trashMode?'恢复到资料库':'删除笔记'} disabled={!!removing} onClick={()=>void(trashMode?restoreVideo(v.id):deleteVideo(v))}>{trashMode?<IconRestore size={17}/>:<IconTrash size={17}/>}</button></article>)}</div>}
           {library.length > 0 && !library.some(v => v.title.toLowerCase().includes(libraryQuery.toLowerCase())) && <p className="muted">没有匹配的笔记。</p>}
         </section>
         <footer className="home-footer"><IconShieldLock size={15} /> 原始时间轴独立保存 · 可读稿随时编辑 · 你的笔记始终可导出</footer>

@@ -47,6 +47,8 @@ def init():
         CREATE TRIGGER IF NOT EXISTS preserve_original BEFORE UPDATE OF segments ON videos
           WHEN OLD.segments IS NOT NULL BEGIN SELECT RAISE(ABORT, 'original transcript is immutable'); END;
         ''')
+        if 'deleted_at' not in {r[1] for r in con.execute('PRAGMA table_info(videos)')}:
+            con.execute('ALTER TABLE videos ADD COLUMN deleted_at TEXT')
         columns = {r[1] for r in con.execute('PRAGMA table_info(jobs)')}
         for name,kind in (('worker_id','TEXT'),('lease_token','TEXT'),('lease_until','REAL')):
             if name not in columns:
@@ -65,6 +67,8 @@ def enqueue(key, url, title, payload):
     with connection() as con:
         con.execute('BEGIN IMMEDIATE')
         video = con.execute('SELECT * FROM videos WHERE id=?', (key,)).fetchone()
+        if video and video['deleted_at']:
+            con.execute('UPDATE videos SET deleted_at=NULL WHERE id=?',(key,))
         if video and video['segments'] and not payload.get('retranscribe'):
             return {'video_id': key, 'cached': True, 'job_id': None}
         active = con.execute("SELECT id FROM jobs WHERE video_id=? AND status IN ('queued','running')", (key,)).fetchone()
@@ -82,7 +86,7 @@ def enqueue(key, url, title, payload):
 
 def get_video(key):
     with connection() as con:
-        row = con.execute('SELECT * FROM videos WHERE id=?', (key,)).fetchone()
+        row = con.execute('SELECT * FROM videos WHERE id=? AND deleted_at IS NULL', (key,)).fetchone()
     if row is None:
         return None
     video = dict(row)
@@ -94,7 +98,25 @@ class LeaseLost(RuntimeError):
     pass
 
 
+def trash_video(key,restore=False):
+    with connection() as con:
+        con.execute('BEGIN IMMEDIATE')
+        if not con.execute('SELECT 1 FROM videos WHERE id=?',(key,)).fetchone():
+            raise ValueError('未找到笔记')
+        if restore:
+            con.execute('UPDATE videos SET deleted_at=NULL WHERE id=?',(key,))
+            if con.execute('SELECT 1 FROM videos WHERE id=? AND segments IS NULL',(key,)).fetchone():
+                last=con.execute('SELECT id,status FROM jobs WHERE video_id=? ORDER BY rowid DESC LIMIT 1',(key,)).fetchone()
+                if last and last['status']=='cancelled':
+                    con.execute("UPDATE jobs SET status='queued',progress=0,stage='笔记已恢复，等待处理' WHERE id=?",(last['id'],))
+        else:
+            con.execute('UPDATE videos SET deleted_at=COALESCE(deleted_at,CURRENT_TIMESTAMP) WHERE id=?',(key,))
+            con.execute("UPDATE jobs SET status='cancelled',stage='笔记已移入回收站',error=NULL,lease_token=NULL,lease_until=NULL WHERE video_id=? AND status IN ('queued','running')",(key,))
+
+
 def fence(con,jid,token):
+    if con.execute('SELECT 1 FROM jobs JOIN videos ON videos.id=jobs.video_id WHERE jobs.id=? AND videos.deleted_at IS NOT NULL',(jid,)).fetchone():
+        raise LeaseLost('笔记已删除，任务不再写入结果')
     if token and not con.execute("SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=? AND lease_until>?",(jid,token,time.time())).fetchone():
         raise LeaseLost('任务租约已失效，此 worker 不再提交结果')
 
@@ -110,7 +132,7 @@ def claim(worker_id='legacy', capabilities=None, lease_seconds=120):
     with connection() as con:
         con.execute('BEGIN IMMEDIATE')
         con.execute("UPDATE jobs SET status='queued',worker_id=NULL,lease_token=NULL,lease_until=NULL,stage='租约到期，等待恢复' WHERE status='running' AND (lease_until IS NULL OR lease_until<?)",(time.time(),))
-        rows = con.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created_at,rowid").fetchall()
+        rows = con.execute("SELECT jobs.* FROM jobs JOIN videos ON videos.id=jobs.video_id WHERE jobs.status='queued' AND videos.deleted_at IS NULL ORDER BY jobs.created_at,jobs.rowid").fetchall()
         row = next((r for r in rows if capabilities is None or json.loads(r['payload']).get('config',{}).get('device','auto') in ('auto',*capabilities)),None)
         if not row:
             return None

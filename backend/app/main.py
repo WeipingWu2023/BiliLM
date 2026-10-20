@@ -186,12 +186,30 @@ async def upload(file: UploadFile = File(...), model: str = Form('small'), confi
 
 
 @app.get('/api/videos')
-def library():
+def library(trash: bool = False):
     with db.connection() as con:
         return [dict(r) for r in con.execute('''SELECT id,title,creator,thumbnail,duration,provenance,created_at,
           CASE WHEN segments IS NULL THEN 0 ELSE 1 END AS ready,
           (SELECT status FROM jobs WHERE video_id=videos.id ORDER BY created_at DESC,rowid DESC LIMIT 1) AS status
-          FROM videos ORDER BY created_at DESC,rowid DESC''')]
+          FROM videos WHERE (deleted_at IS NOT NULL)=? ORDER BY created_at DESC,rowid DESC''',(int(trash),))]
+
+
+@app.delete('/api/videos/{key}')
+def delete_video(key: str):
+    try:
+        db.trash_video(key)
+        return {'ok':True}
+    except ValueError as exc:
+        raise HTTPException(404,str(exc))
+
+
+@app.post('/api/videos/{key}/restore')
+def restore_video(key: str):
+    try:
+        db.trash_video(key,restore=True)
+        return {'ok':True}
+    except ValueError as exc:
+        raise HTTPException(404,str(exc))
 
 
 @app.get('/api/videos/{key}')
@@ -226,7 +244,7 @@ def retranscribe(key: str, body: ASRConfig):
 
 def run_or_404(rid):
     result = versions.get(rid)
-    if not result:
+    if not result or not db.get_video(result['video_id']):
         raise HTTPException(404,'未找到转录版本')
     return result
 
@@ -478,7 +496,7 @@ def download(key: str, format: str = 'txt'):
 @app.get('/api/jobs')
 def jobs():
     with db.connection() as con:
-        return [dict(r) for r in con.execute('SELECT id,video_id,status,progress,stage,error,attempts,created_at FROM jobs ORDER BY created_at DESC,rowid DESC LIMIT 100')]
+        return [dict(r) for r in con.execute('SELECT jobs.id,video_id,status,progress,stage,error,attempts,jobs.created_at FROM jobs JOIN videos ON videos.id=jobs.video_id WHERE videos.deleted_at IS NULL ORDER BY jobs.created_at DESC,jobs.rowid DESC LIMIT 100')]
 
 
 @app.post('/api/jobs/{jid}/retry')
@@ -488,6 +506,8 @@ def retry(jid: str):
         job = con.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone()
         if not job:
             raise HTTPException(404,'未找到任务')
+        if not con.execute('SELECT 1 FROM videos WHERE id=? AND deleted_at IS NULL',(job['video_id'],)).fetchone():
+            raise HTTPException(404,'笔记已删除')
         if job['status'] != 'failed':
             raise HTTPException(409,'仅失败任务可重试')
         if con.execute("SELECT 1 FROM jobs WHERE video_id=? AND status IN ('queued','running')",(job['video_id'],)).fetchone():
